@@ -1,0 +1,157 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r include=FALSE}
+install.packages("ggplot2")
+install.packages("ggthemes")
+install.packages("dplyr")
+install.packages("viridis")
+install.packages("tidyr")
+install.packages("cluster")
+install.packages("ggmap")
+install.packages("maps")
+```
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(viridis)
+library(tidyr)
+library(cluster)
+library(ggmap)
+library(maps)
+```
+
+```{r}
+toronto <- read.csv('data/MCI_2014_to_2017.csv')
+toronto <- subset(toronto, !duplicated(toronto$event_unique_id))
+unique(toronto$occurrenceyear)
+unique(toronto$reportedyear)
+```
+```{r}
+year_group <- group_by(toronto, occurrenceyear)
+crime_by_year <- summarise(year_group,
+                          n = n())
+crime_by_year
+```
+
+```{r}
+drops <- c("X", "Y", "Index_", "ucr_code", "ucr_ext", "reporteddate", "reportedmonth", "reportedday", "reporteddayofyear", "reporteddayofweek", "reportedhour", "occurrencedayofyear", "reportedyear", "Division", "Hood_ID", "FID")
+toronto <- toronto[, !(names(toronto) %in% drops)]
+toronto <- toronto[toronto$occurrenceyear == 2017, ]
+toronto <- toronto[complete.cases(toronto), ]
+```
+
+```{r}
+indicator_group <- group_by(toronto, MCI)
+crime_by_indicator <- summarise(indicator_group, n=n())
+crime_by_indicator <- crime_by_indicator[order(crime_by_indicator$n, decreasing = TRUE),]
+ggplot(aes(x = reorder(MCI, n), y = n), data = crime_by_indicator) +
+  geom_bar(stat = 'identity', width = 0.5) +
+  geom_text(aes(label = n), stat = 'identity', data = crime_by_indicator, hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  xlab('Major Crime Indicators') +
+  ylab('Number of Occurrences') +
+  ggtitle('Major Crime Indicators Toronto 2017') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+```{r}
+assault <- toronto[toronto$MCI == 'Assault', ]
+assault_group <- group_by(assault, offence)
+assault_by_offence <- summarise(assault_group, n=n())
+assault_by_offence <- assault_by_offence[order(assault_by_offence$n, decreasing = TRUE), ]
+ggplot(aes(x = reorder(offence, n), y = n), data = assault_by_offence) +
+  geom_bar(stat = 'identity', width = 0.6) +
+  geom_text(aes(label = n), stat = 'identity', data = assault_by_offence, hjust = -0.1, size = 3) +
+  coord_flip() +
+  xlab('Types of Assault') +
+  ylab('Number of Occurrences') +
+  ggtitle('Assault Crime Toronto 2017') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+
+```
+```{r}
+offence_group <- group_by(toronto, offence)
+crime_by_offence <- summarise(offence_group, n=n())
+crime_by_offence <- crime_by_offence[order(crime_by_offence$n, decreasing = TRUE), ]
+ggplot(aes(x = reorder(offence, n), y = n), data = crime_by_offence) +
+  geom_bar(stat = 'identity', width = 0.7) +
+  geom_text(aes(label = n), stat = 'identity', data = crime_by_offence, hjust = -0.1, size = 2) +
+  coord_flip() +
+  xlab('Types of Offence') +
+  ylab('Number of Occurrences') +
+  ggtitle('Offence Types Toronto 2017') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+
+```{r}
+hour_group <- group_by(toronto, occurrencehour)
+crime_hour <- summarise(hour_group, n=n())
+ggplot(aes(x=occurrencehour, y=n), data = crime_hour) + geom_line(size = 2.5, alpha = 0.7, color = "mediumseagreen", group=1) + 
+  geom_point(size = 0.5) + 
+  ggtitle('Total Crimes by Hour of Day in Toronto 2017') +
+  ylab('Number of Occurrences') +
+  xlab('Hour(24-hour clock)') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+```{r}
+hour_crime_group <- group_by(toronto, occurrencehour, MCI)
+
+hour_crime <- summarise(hour_crime_group, n=n())
+ggplot(aes(x=occurrencehour, y=n, color=MCI), data =hour_crime) + 
+  geom_line(size=1.5) + 
+  ggtitle('Crime Types by Hour of Day in Toronto 2017') +
+  ylab('Number of Occurrences') +
+  xlab('Hour(24-hour clock)') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+
+```{r}
+location_group <- group_by(toronto, Neighbourhood)
+crime_by_location <- summarise(location_group, n=n())
+crime_by_location <- crime_by_location[order(crime_by_location$n, decreasing = TRUE), ]
+crime_by_location_top20 <- head(crime_by_location, 20)
+ggplot(aes(x = reorder(Neighbourhood, n), y = n), data = crime_by_location_top20) +
+  geom_bar(stat = 'identity', width = 0.6) +
+  geom_text(aes(label = n), stat = 'identity', data = crime_by_location_top20, hjust = -0.1, size = 3) +
+  coord_flip() +
+  xlab('Neighbourhoods') +
+  ylab('Number of Occurrences') +
+  ggtitle('Neighbourhoods with Most Crimes - Top 20') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+
+```
+
+
+```{r}
+offence_location_group <- group_by(toronto, Neighbourhood, offence)
+offence_type_by_location <- summarise(offence_location_group, n=n())
+offence_type_by_location <- offence_type_by_location[order(offence_type_by_location$n, decreasing = TRUE), ]
+offence_type_by_location_top20 <- head(offence_type_by_location, 20)
+ggplot(aes(x = Neighbourhood, y=n, fill = offence), data=offence_type_by_location_top20) +
+  geom_bar(stat = 'identity', position = position_dodge(), width = 0.8) +
+  xlab('Neighbourhood') +
+  ylab('Number of Occurrence') +
+  ggtitle('Offence Type vs. Neighbourhood Toronto 2017') + theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = .4))
+```
+
