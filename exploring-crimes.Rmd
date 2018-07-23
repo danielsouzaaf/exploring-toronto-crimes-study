@@ -155,3 +155,30 @@ ggplot(aes(x = Neighbourhood, y=n, fill = offence), data=offence_type_by_locatio
         axis.text.x = element_text(angle = 90, hjust = 1, vjust = .4))
 ```
 
+```{r}
+crime_count <- toronto %>% group_by(occurrencemonth, MCI) %>% summarise(Total = n())
+crime_count$occurrencemonth <- ordered(crime_count$occurrencemonth, levels = c('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'))
+
+ggplot(crime_count, aes(occurrencemonth, MCI, fill = Total)) +
+  geom_tile(size = 1, color = "white") +
+  scale_fill_viridis()  +
+  geom_text(aes(label=Total), color='white') +
+  ggtitle("Major Crime Indicators by Month 2017") +
+  xlab('Month') +
+  theme(plot.title = element_text(size = 16), 
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+```{r}
+day_count <- toronto %>% group_by(occurrencedayofweek, MCI) %>% summarise(Total = n())
+
+ggplot(day_count, aes(occurrencedayofweek, MCI, fill = Total)) +
+  geom_tile(size = 1, color = "white") +
+  scale_fill_viridis()  +
+  geom_text(aes(label=Total), color='white') +
+  ggtitle("Major Crime Indicators by Day of Week 2017") +
+  xlab('Day of Week') +
+  theme(plot.title = element_text(size = 16), 
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
