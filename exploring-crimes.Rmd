@@ -13,7 +13,7 @@ install.packages("ggmap")
 install.packages("maps")
 ```
 
-```{r}
+```{r include=FALSE}
 library(ggplot2)
 library(ggthemes)
 library(dplyr)
@@ -43,6 +43,8 @@ toronto <- toronto[, !(names(toronto) %in% drops)]
 toronto <- toronto[toronto$occurrenceyear == 2017, ]
 toronto <- toronto[complete.cases(toronto), ]
 ```
+
+## Explore
 
 ```{r}
 indicator_group <- group_by(toronto, MCI)
@@ -180,5 +182,140 @@ ggplot(day_count, aes(occurrencedayofweek, MCI, fill = Total)) +
   xlab('Day of Week') +
   theme(plot.title = element_text(size = 16), 
         axis.title = element_text(size = 12, face = "bold"))
+```
+
+## Homicide
+
+```{r}
+homicide <- read.csv('data/Homicide.csv', stringsAsFactors = F)
+str(homicide)
+head(homicide)
+```
+```{r include=FALSE}
+homicide$occurence_date <- substr(homicide$occurrence_date, 0, 10)
+homicide$occurrence_date <- as.Date(homicide$occurrence_date)
+```
+
+```{r}
+year_group <- group_by(homicide, year_, homicide_type)
+homicide_by_year <- summarise(year_group, n=n())
+ggplot(aes(x = year_, y=n, fill = homicide_type), data=homicide_by_year) +
+  geom_bar(stat = 'identity', position = position_dodge(), width = 0.8) +
+  xlab('Year') +
+  ylab('Number of Homicides') +
+  ggtitle('Homicide 2004-2017') + theme_bw() +
+  theme(plot.title = element_text(size = 16),
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+```{r}
+homicide$month <- format(as.Date(homicide$occurrence_date) , "%B")
+homicide_count <- homicide %>% group_by(year_, month) %>% summarise(Total = n())
+homicide_count$month <- ordered(homicide_count$month, levels = c('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'))
+ggplot(homicide_count, aes(year_, month, fill = Total)) +
+  geom_tile(size = 1, color = "white") +
+  scale_fill_viridis()  +
+  geom_text(aes(label=Total), color='white') +
+  ggtitle("Homicides in Toronto (2004-2017)") +
+  xlab('Year') +
+  theme(plot.title = element_text(size = 16), 
+        axis.title = element_text(size = 12, face = "bold"))
+```
+
+## K-Mean Clustering
+
+
+```{r}
+by_groups <- group_by(toronto, MCI, Neighbourhood)
+groups <- summarise(by_groups, n=n())
+groups <- groups[c("Neighbourhood", "MCI", "n")]
+groups_wide <- spread(groups, key = MCI, value = n)
+```
+
+```{r}
+z <- groups_wide[, -c(1,1)]
+z <- z[complete.cases(z), ]
+```
+
+```{r}
+m <- apply(z, 2, mean)
+s <- apply(z, 2, sd)
+z <- scale(z, m, s)
+```
+
+```{r}
+wss <- (nrow(z)-1) * sum(apply(z, 2, var))
+for (i in 2:20) wss[i] <- sum(kmeans(z, centers=i)$withiness)
+plot(1:20, wss, type='b', xlab='Number of Clusters', ylab='Within groups sum of squares')
+```
+
+```{r}
+kc <- kmeans(z, 2)
+kc
+```
+
+```{r}
+z1 <- data.frame(z, kc$cluster)
+clusplot(z1, kc$cluster, color=TRUE, shade=F, labels=0, lines=0, main='k-Means Cluster Analysis')
+```
+
+## Hierarchical Clustering
+
+
+```{r}
+z2 <- data.frame(z)
+distance <- dist(z2)
+hc <- hclust(distance)
+groups_wide <- groups_wide[complete.cases(groups_wide), ]
+
+```
+
+```{r}
+plot(hc, labels = groups_wide$Neighbourhood, main='Cluster Dendrogram', cex=0.65)
+```
+
+```{r}
+counts = sapply(2:6,function(ncl)table(cutree(hc,ncl)))
+names(counts) = 2:6
+counts
+```
+
+```{r}
+member <- cutree(hc, 3)
+aggregate(z, list(member), mean)
+```
+
+```{r}
+plot(silhouette(cutree(hc, 3), distance))
+```
+
+## Mapping.
+
+```{r}
+lat <- toronto$Lat
+lon <- toronto$Long
+crimes <- toronto$MCI
+to_map <- data.frame(crimes, lat, lon)
+colnames(to_map) <- c('crimes', 'lat', 'lon')
+sbbox <- make_bbox(lon = toronto$Long, lat = toronto$Lat, f = 0.01)
+my_map <- get_map(location = sbbox, maptype = "roadmap", scale = 2, color="bw", zoom = 10)
+ggmap(my_map) +
+  geom_point(data=to_map, aes(x = lon, y = lat, color = "#27AE60"), 
+             size = 0.5, alpha = 0.05) +
+  xlab('Longitude') +
+  ylab('Latitude') +
+  ggtitle('Location of Major Crime Indicators Toronto 2017') +
+  guides(color=FALSE)
+```
+
+```{r}
+ggmap(my_map) +
+  geom_point(data=to_map, aes(x = lon, y = lat, color = "#27AE60"), 
+             size = 0.5, alpha = 0.05) +
+  xlab('Longitude') +
+  ylab('Latitude') +
+  ggtitle('Location of Major Crime Indicators Toronto 2017') +
+  guides(color=FALSE) +
+  facet_wrap(~ crimes, nrow = 2)
 ```
 
